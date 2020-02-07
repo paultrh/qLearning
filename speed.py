@@ -27,6 +27,7 @@ VEL = 5
 
 MAP_SIZE = 50
 
+
 # Sizing
 # Move base is 1
 # 1 block is 10 move
@@ -346,6 +347,7 @@ class Player:
 
         for idx, sensor in enumerate(self.sensors):
             collide = False
+            colliders = []
             for wall in self.map.wall_points:
                 for vect in wall.get_vects():
                     res = intersectLines((sensor.x1, sensor.y1), (sensor.x2, sensor.y2), (vect.x1, vect.y1),
@@ -354,36 +356,40 @@ class Player:
                         collide = True
                         x, y = int(res[0]), int(res[1])
                         dist = distance((self.centerX, self.centerY), (x, y)) - self.size / 2
-                        self.impacts.append(-max(1, min(round(dist / 5), 4)))
+                        colliders.append([dist, x, y])
                         minCoord = (x, y)
-                        self.points.append(
-                            minCoord
-                        )
-                        break
-                if collide:
-                    break
+                        #self.points.append(
+                        #    minCoord
+                        #)
 
-            if not collide:
-                for indexB, bonus in enumerate(self.map.bonus_points):
-                    if indexB in self.map.collected_bonus:
-                        continue
-                    for b in bonus.get_vects():
-                        res = intersectLines((sensor.x1, sensor.y1), (sensor.x2, sensor.y2), (b.x1, b.y1),
-                                             (b.x2, b.y2))
-                        if res[2]:
-                            collide = True
-                            x, y = int(res[0]), int(res[1])
-                            dist = distance((self.centerX, self.centerY), (x, y)) - self.size / 2
-                            self.impacts.append(max(1, min(round(dist / 5), 4)))
-                            minCoord = (x, y)
-                            self.points.append(
-                                minCoord
-                            )
-                            break
-                    if collide:
-                        break
+            for indexB, bonus in enumerate(self.map.bonus_points):
+                if indexB in self.map.collected_bonus:
+                    continue
+                for b in bonus.get_vects():
+                    res = intersectLines((sensor.x1, sensor.y1), (sensor.x2, sensor.y2), (b.x1, b.y1),
+                                         (b.x2, b.y2))
+                    if res[2]:
+                        collide = True
+                        x, y = int(res[0]), int(res[1])
+                        dist = distance((self.centerX, self.centerY), (x, y)) - self.size / 2
+                        colliders.append([dist, x, y])
+                        # self.impacts.append(max(1, min(round(dist / 5), 4)))
+                        minCoord = (x, y)
+                        #self.points.append(
+                        #    minCoord
+                        #)
 
-            if not collide:
+            if collide:
+                min_impact = colliders[0]
+                for idx, impact in enumerate(colliders):
+                    if min_impact[0] > impact[0]:
+                        min_impact = impact
+
+                self.impacts.append(-max(1, min(round(min_impact[0] / 5), 4)))
+                self.points.append(
+                    (min_impact[1], min_impact[2])
+                )
+            else:
                 self.impacts.append(0)
 
         return Lreward, tuple(self.impacts)
@@ -403,15 +409,13 @@ def generate_qtable():
     return {}
     start = time.time()
     qtable = {}
-    for i in itertools.product([-4, -3, -2, -1, 0, 1, 2, 3, 4], repeat=8): # complexity is 9 ** 8
+    for i in itertools.product([-4, -3, -2, -1, 0, 1, 2, 3, 4], repeat=8):  # complexity is 9 ** 8
         qtable[i] = 0
     print(time.time() - start)
     return qtable
 
 
 q_table = generate_qtable()
-
-
 
 pygame.init()
 win = pygame.display.set_mode((500, 500))
@@ -420,6 +424,8 @@ already_dead_ops = set()
 start = time.time()
 episode_rewards = []
 random_liberty = []
+
+MANUAL = True
 
 pool = ThreadPool(4)
 for episode in range(HM_EPISODES):
@@ -432,10 +438,10 @@ for episode in range(HM_EPISODES):
     else:
         show = False
     r = False
-    #while 1:
+    # while 1:
     for i in range(200):
         obs = p.get_state()
-        #pygame.time.delay(500)
+        # pygame.time.delay(500)
 
         action = 0
         if np.random.random() > epsilon:
@@ -450,49 +456,46 @@ for episode in range(HM_EPISODES):
             r = True
             action = np.random.randint(0, 4)
 
-        #action = np.argmax(q_table[obs])
-        #action = np.argmax((q_table[obs]))
+        # action = np.argmax(q_table[obs])
+        # action = np.argmax((q_table[obs]))
 
         x = 0
         y = 0
 
-        """
-        pygame.event.wait()
-        keys = pygame.key.get_pressed()
-        
-        if keys[pygame.K_LEFT]:
-            x -= VEL
+        if MANUAL:
+            pygame.event.wait()
+            keys = pygame.key.get_pressed()
 
-        if keys[pygame.K_RIGHT]:
-            x += VEL
+            if keys[pygame.K_LEFT]:
+                x -= VEL
 
-        if keys[pygame.K_UP]:
-            y -= VEL
+            if keys[pygame.K_RIGHT]:
+                x += VEL
 
-        if keys[pygame.K_DOWN]:
-            y += VEL
+            if keys[pygame.K_UP]:
+                y -= VEL
 
-        """
+            if keys[pygame.K_DOWN]:
+                y += VEL
+        else:
 
-        # Move Up
-        if action == 0:
-            y -= VEL
+            # Move Up
+            if action == 0:
+                y -= VEL
 
-        # Move Right
-        if action == 1:
-            x += VEL
+            # Move Right
+            if action == 1:
+                x += VEL
 
-        # Move Down
-        if action == 2:
-            y += VEL
+            # Move Down
+            if action == 2:
+                y += VEL
 
-        # Move Left
-        if action == 3:
-            x -= VEL
-            
+            # Move Left
+            if action == 3:
+                x -= VEL
 
-
-        #print(f"on pos {p.centerX} {p.centerY} {obs}") # 122.5 377.5
+        # print(f"on pos {p.centerX} {p.centerY} {obs}") # 122.5 377.5
 
         reward, new_obs = p.update(x, y)
 
@@ -503,7 +506,7 @@ for episode in range(HM_EPISODES):
         else:
             max_future_q = np.random.randint(0, 4)
 
-        #max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
+        # max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
 
         q_table.setdefault(obs, [0, 0, 0, 0])
         current_q = q_table.get(obs)[action]  # current Q for our chosen action
@@ -522,8 +525,8 @@ for episode in range(HM_EPISODES):
             break
 
         if show:
-            #pygame.time.delay(1000)
-            #print(obs)
+            # pygame.time.delay(1000)
+            # print(obs)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -541,10 +544,9 @@ for episode in range(HM_EPISODES):
     epsilon *= EPS_DECAY
     random_liberty.append(epsilon)
 
+    # p.update(x, y)
 
-        # p.update(x, y)
-
-#moving_avg = np.convolve(episode_rewards, np.ones((SHOW_EVERY,))/SHOW_EVERY, mode='valid')
+# moving_avg = np.convolve(episode_rewards, np.ones((SHOW_EVERY,))/SHOW_EVERY, mode='valid')
 
 plt.plot([i for i in episode_rewards])
 plt.ylabel(f"Rewards")
@@ -558,6 +560,5 @@ plt.show()
 
 with open(f"qtable.pickle", "wb") as f:
     pickle.dump(q_table, f)
-
 
 pygame.quit()
