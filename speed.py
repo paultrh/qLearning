@@ -5,22 +5,47 @@ import pickle
 import numpy as np
 import pygame
 import itertools
+from multiprocessing.dummy import Pool as ThreadPool
+import matplotlib
 import matplotlib.pyplot as plt
 from numba import jit
 
-
 win = None
+
+HM_EPISODES = 5000
+MOVE_PENALTY = 1  # feel free to tinker with these!
+DEATH_PENALTY = 1000  # feel free to tinker with these!
+
+FOOD_REWARD = 500  # feel free to tinker with these!
+epsilon = 0.3  # randomness
+EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
+SHOW_EVERY = 1000  # how often to play through env visually.
+
+LEARNING_RATE = 0.3
+DISCOUNT = 0.95
+VEL = 5
+
+MAP_SIZE = 50
+
+# Sizing
+# Move base is 1
+# 1 block is 10 move
+# sensor should see at 2 blocks
+# init pos is 1.5 block in x and y
+# allowed move is 5 * nb block in first row
 
 
 @jit(nopython=True)
 def get_orientation(p1, p2, p3):
     return ((p2[1] - p1[1]) * (p3[0] - p2[0])) - ((p3[1] - p2[1]) * (p2[0] - p1[0]))
 
+
 @jit(nopython=True)
 def intersect(x1, y1, x2, y2, x3, y3, x4, y4):
     or1 = get_orientation((x1, y1), (x2, y2), (x4, y4)) * get_orientation((x1, y1), (x2, y2), (x3, y3))
     or2 = get_orientation((x3, y3), (x4, y4), (x1, y1)) * get_orientation((x3, y3), (x4, y4), (x2, y2))
     return or1 < 0 and or2 < 0
+
 
 @jit(nopython=True)
 def intersectLines(pt1, pt2, ptA, ptB):
@@ -39,25 +64,6 @@ def intersectLines(pt1, pt2, ptA, ptB):
     dx = xB - x
     dy = yB - y
 
-    # we need to find the (typically unique) values of r and s
-    # that will satisfy
-    #
-    # (x1, y1) + r(dx1, dy1) = (x, y) + s(dx, dy)
-    #
-    # which is the same as
-    #
-    #    [ dx1  -dx ][ r ] = [ x-x1 ]
-    #    [ dy1  -dy ][ s ] = [ y-y1 ]
-    #
-    # whose solution is
-    #
-    #    [ r ] = _1_  [  -dy   dx ] [ x-x1 ]
-    #    [ s ] = DET  [ -dy1  dx1 ] [ y-y1 ]
-    #
-    # where DET = (-dx1 * dy + dy1 * dx)
-    #
-    # if DET is too small, they're parallel
-    #
     DET = (-dx1 * dy + dy1 * dx)
 
     if math.fabs(DET) < DET_TOLERANCE: return (0, 0, 0, 0, 0)
@@ -99,7 +105,7 @@ class Vect:
         pygame.draw.line(win, color, (self.x1, self.y1), (self.x2, self.y2))
 
 
-class Tri:
+class Seg:
     def __init__(self, a, color):
         self.a = a
         self.color = color
@@ -111,6 +117,23 @@ class Tri:
 
     def draw(self):
         self.a.draw(self.color)
+
+
+class Cross:
+    def __init__(self, a, b, color):
+        self.a = a
+        self.b = b
+        self.color = color
+
+    def get_vects(self):
+        return [
+            self.a,
+            self.b,
+        ]
+
+    def draw(self):
+        self.a.draw(self.color)
+        self.b.draw(self.color)
 
 
 class Rect:
@@ -158,32 +181,65 @@ class Map:
         self.wall_points = []
         for indexL, line in enumerate(self.lines):
             for indexR, elt in enumerate(line.split(',')):
-                if int(elt) == 0:
-                    x1 = indexL * self.size
-                    y1 = indexR * self.size
+                x1 = indexL * self.size
+                y1 = indexR * self.size
+                if int(elt) == 1:
                     self.wall_points.append(
-                        Rect(
-                            Vect(x1, y1, x1 + self.size, y1),
-                            Vect(x1, y1, x1, y1 + self.size),
-                            Vect(x1 + self.size, y1 + self.size, x1 + self.size, y1),
-                            Vect(x1 + self.size, y1 + self.size, x1, y1 + self.size),
+                        Seg(
+                            Vect(x1 + self.size / 2, y1, x1 + self.size / 2, y1 + self.size),
                             (122, 122, 122)
                         ))
                 if int(elt) == 2:
-                    x1 = indexL * self.size
-                    y1 = indexR * self.size
+                    self.wall_points.append(
+                        Seg(
+                            Vect(x1, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
+                            (122, 122, 122)
+                        ))
+                ##########
+                if int(elt) == 3:
+                    self.wall_points.append(
+                        Cross(
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 + self.size),
+                            (122, 122, 122)
+                        )
+                    )
+                if int(elt) == 4:
+                    self.wall_points.append(
+                        Cross(
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 - self.size),
+                            (122, 122, 122)
+                        )
+                    )
+                if int(elt) == 5:
+                    self.wall_points.append(
+                        Cross(
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 - self.size, y1 + self.size / 2),
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 - self.size),
+                            (122, 122, 122)
+                        )
+                    )
+                if int(elt) == 6:
+                    self.wall_points.append(
+                        Cross(
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 - self.size, y1 + self.size / 2),
+                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 + self.size),
+                            (122, 122, 122)
+                        )
+                    )
+                ##########
+                if int(elt) == 7:
                     self.bonus_points.append(
-                        Tri(
-                            Vect(x1 + self.size / 5, y1 + self.size / 2, x1 + self.size - self.size / 5, y1 + self.size / 2),
+                        Seg(
+                            Vect(x1, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
                             (0, 255, 255)
                         )
                     )
-                if int(elt) == 3:
-                    x1 = indexL * self.size
-                    y1 = indexR * self.size
+                if int(elt) == 8:
                     self.bonus_points.append(
-                        Tri(
-                            Vect(x1 + self.size / 2, y1 + self.size / 5, x1 + self.size / 2, y1 + self.size - self.size / 5),
+                        Seg(
+                            Vect(x1 + self.size / 2, y1, x1 + self.size / 2, y1 + self.size),
                             (0, 255, 255)
                         )
                     )
@@ -207,7 +263,7 @@ class Player:
         self.y = y
         self.size = size
         self.points = []
-        self.impacts = [0 for i in range(4)]
+        self.impacts = [0 for i in range(8)]
 
         self.centerX = self.x + size / 2
         self.centerY = self.y + size / 2
@@ -219,10 +275,10 @@ class Player:
             (0, 0, 255)
         )
         self.sensors = [
-            #Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
-            #Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
-            #Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
-            #Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX, self.centerY + self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX, self.centerY - self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY),
@@ -230,7 +286,7 @@ class Player:
         ]
 
     def update(self, x, y):
-        Lreward = -1
+        Lreward = -MOVE_PENALTY
         self.x = self.x + x
         self.y = self.y + y
         self.centerX = self.x + self.size / 2
@@ -243,10 +299,10 @@ class Player:
             (255, 255, 255)
         )
         self.sensors = [
-            #Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
-            #Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
-            #Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
-            #Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX, self.centerY - self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY),
             Vect(self.centerX, self.centerY, self.centerX, self.centerY + self.sensor_size),
@@ -261,7 +317,7 @@ class Player:
                     res = intersectLines((vectC.x1, vectC.y1), (vectC.x2, vectC.y2), (vectW.x1, vectW.y1),
                                          (vectW.x2, vectW.y2))
                     if res[2]:
-                        Lreward = -300
+                        Lreward = -DEATH_PENALTY
                         collide = True
                         break
                 if collide:
@@ -269,17 +325,19 @@ class Player:
             if collide:
                 break
 
-        if Lreward != -300:
-            for bonus in self.map.bonus_points:
+        if Lreward != -DEATH_PENALTY:
+            for indexB, bonus in enumerate(self.map.bonus_points):
                 collide = False
-                for ib, b in enumerate(bonus.get_vects()):
+                if indexB in self.map.collected_bonus:
+                    continue
+                for b in bonus.get_vects():
                     for vectC in self.car.get_vects():
                         res = intersectLines((vectC.x1, vectC.y1), (vectC.x2, vectC.y2), (b.x1, b.y1),
                                              (b.x2, b.y2))
                         if res[2]:
-                            Lreward = 20
+                            Lreward = FOOD_REWARD
                             collide = True
-                            self.map.collected_bonus.append(ib)
+                            self.map.collected_bonus.append(indexB)
                             break
                     if collide:
                         break
@@ -306,7 +364,9 @@ class Player:
                     break
 
             if not collide:
-                for bonus in self.map.bonus_points:
+                for indexB, bonus in enumerate(self.map.bonus_points):
+                    if indexB in self.map.collected_bonus:
+                        continue
                     for b in bonus.get_vects():
                         res = intersectLines((sensor.x1, sensor.y1), (sensor.x2, sensor.y2), (b.x1, b.y1),
                                              (b.x2, b.y2))
@@ -324,7 +384,7 @@ class Player:
                         break
 
             if not collide:
-                self.impacts.append(-1)
+                self.impacts.append(0)
 
         return Lreward, tuple(self.impacts)
 
@@ -339,35 +399,32 @@ class Player:
         return tuple(self.impacts)
 
 
-start = time.time()
-q_table = {}
-for i in itertools.product([-4, -3, -2, -1, 0, 1, 2, 3, 4], repeat=4):
-    q_table[i] = [random.randint(0, 4) for i in range(4)]
-print(time.time() - start)
+def generate_qtable():
+    return {}
+    start = time.time()
+    qtable = {}
+    for i in itertools.product([-4, -3, -2, -1, 0, 1, 2, 3, 4], repeat=8): # complexity is 9 ** 8
+        qtable[i] = 0
+    print(time.time() - start)
+    return qtable
 
-HM_EPISODES = 1000
-MOVE_PENALTY = 1  # feel free to tinker with these!
-ENEMY_PENALTY = 300  # feel free to tinker with these!
 
-FOOD_REWARD = 25  # feel free to tinker with these!
-TARGET_REWARD = 100
-epsilon = 0.3  # randomness
-EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
-SHOW_EVERY = 100  # how often to play through env visually.
+q_table = generate_qtable()
 
-LEARNING_RATE = 0.5
-DISCOUNT = 0.95
-VEL = 10
 
-MAP_SIZE = 50
 
 pygame.init()
 win = pygame.display.set_mode((500, 500))
 
+already_dead_ops = set()
+start = time.time()
 episode_rewards = []
+random_liberty = []
+
+pool = ThreadPool(4)
 for episode in range(HM_EPISODES):
     map = Map('map.txt', MAP_SIZE, win)
-    p = Player(15 * 5, 15 * 5, 15, map, sensor_size=50)
+    p = Player(15 * 5, 15 * 5, 15, map, sensor_size=75)
     episode_reward = 0
 
     if episode % SHOW_EVERY == 0:
@@ -375,17 +432,22 @@ for episode in range(HM_EPISODES):
     else:
         show = False
     r = False
-    while 1:
-    #for i in range(200):
+    #while 1:
+    for i in range(200):
         obs = p.get_state()
-        # pygame.time.delay(5000)
+        #pygame.time.delay(500)
 
-
+        action = 0
         if np.random.random() > epsilon:
-            r = True
-            action = np.argmax(q_table[obs])
-        else:
             r = False
+            list_action_score = q_table.get(obs, None)
+            if list_action_score:
+                action = np.argmax(list_action_score)
+            else:
+                action = np.random.randint(0, 4)
+
+        else:
+            r = True
             action = np.random.randint(0, 4)
 
         #action = np.argmax(q_table[obs])
@@ -394,7 +456,7 @@ for episode in range(HM_EPISODES):
         x = 0
         y = 0
 
-
+        """
         pygame.event.wait()
         keys = pygame.key.get_pressed()
         
@@ -410,36 +472,53 @@ for episode in range(HM_EPISODES):
         if keys[pygame.K_DOWN]:
             y += VEL
 
-
-
         """
+
+        # Move Up
         if action == 0:
             y -= VEL
 
+        # Move Right
         if action == 1:
             x += VEL
 
+        # Move Down
         if action == 2:
             y += VEL
 
+        # Move Left
         if action == 3:
             x -= VEL
-        """
+            
+
+
+        #print(f"on pos {p.centerX} {p.centerY} {obs}") # 122.5 377.5
+
         reward, new_obs = p.update(x, y)
-        print(reward, new_obs)
-        max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
-        current_q = q_table[obs][action]  # current Q for our chosen action
+
+        list_action_score_future = q_table.get(new_obs, None)
+        max_future_q = 0
+        if list_action_score_future:
+            max_future_q = np.argmax(list_action_score_future)
+        else:
+            max_future_q = np.random.randint(0, 4)
+
+        #max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
+
+        q_table.setdefault(obs, [0, 0, 0, 0])
+        current_q = q_table.get(obs)[action]  # current Q for our chosen action
         new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (reward + DISCOUNT * max_future_q)
-        if reward == -300:
-            new_q = -300
+        if reward == -DEATH_PENALTY:
+            if not r and obs + (action,) in already_dead_ops:
+                print(f"DIED AGAIN ON {obs} doing a {action} on pos {p.centerX} {p.centerY}")
+            already_dead_ops.add(obs + (action,))
+            new_q = -DEATH_PENALTY
 
         q_table[obs][action] = new_q
 
         episode_reward += reward
-        if reward == -300:
-            if r:
-                print("random ", end='')
-            print("DIED", obs, action)
+
+        if reward == -DEATH_PENALTY:
             break
 
         if show:
@@ -454,9 +533,14 @@ for episode in range(HM_EPISODES):
             p.draw()
             pygame.display.update()
 
-    #print(f"{episode} - {episode_reward}")
+    if episode % SHOW_EVERY == 0:
+        print(f"{episode} - {episode_reward} in {time.time() - start}")
+        start = time.time()
+
     episode_rewards.append(episode_reward)
     epsilon *= EPS_DECAY
+    random_liberty.append(epsilon)
+
 
         # p.update(x, y)
 
@@ -464,6 +548,11 @@ for episode in range(HM_EPISODES):
 
 plt.plot([i for i in episode_rewards])
 plt.ylabel(f"Rewards")
+plt.xlabel("episode #")
+plt.show()
+
+plt.plot([i for i in random_liberty])
+plt.ylabel(f"Liberty")
 plt.xlabel("episode #")
 plt.show()
 
