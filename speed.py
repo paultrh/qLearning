@@ -424,6 +424,7 @@ already_dead_ops = set()
 start = time.time()
 episode_rewards = []
 random_liberty = []
+len_qtable = []
 
 MANUAL = False
 
@@ -543,6 +544,7 @@ for episode in range(HM_EPISODES):
     episode_rewards.append(episode_reward)
     epsilon *= EPS_DECAY
     random_liberty.append(epsilon)
+    len_qtable.append(len(q_table))
 
     # p.update(x, y)
 
@@ -555,6 +557,11 @@ plt.show()
 
 plt.plot([i for i in random_liberty])
 plt.ylabel(f"Liberty")
+plt.xlabel("episode #")
+plt.show()
+
+plt.plot([i for i in len_qtable])
+plt.ylabel(f"Len q table")
 plt.xlabel("episode #")
 plt.show()
 
