@@ -425,7 +425,7 @@ start = time.time()
 episode_rewards = []
 random_liberty = []
 
-MANUAL = True
+MANUAL = False
 
 pool = ThreadPool(4)
 for episode in range(HM_EPISODES):
