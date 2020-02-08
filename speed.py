@@ -356,7 +356,7 @@ class Player:
                         collide = True
                         x, y = int(res[0]), int(res[1])
                         dist = distance((self.centerX, self.centerY), (x, y)) - self.size / 2
-                        colliders.append([dist, x, y])
+                        colliders.append([dist, x, y, -1])
                         minCoord = (x, y)
                         #self.points.append(
                         #    minCoord
@@ -372,7 +372,7 @@ class Player:
                         collide = True
                         x, y = int(res[0]), int(res[1])
                         dist = distance((self.centerX, self.centerY), (x, y)) - self.size / 2
-                        colliders.append([dist, x, y])
+                        colliders.append([dist, x, y, 1])
                         # self.impacts.append(max(1, min(round(dist / 5), 4)))
                         minCoord = (x, y)
                         #self.points.append(
@@ -385,7 +385,7 @@ class Player:
                     if min_impact[0] > impact[0]:
                         min_impact = impact
 
-                self.impacts.append(-max(1, min(round(min_impact[0] / 5), 4)))
+                self.impacts.append(min_impact[3] * max(1, min(round(min_impact[0] / 5), 4)))
                 self.points.append(
                     (min_impact[1], min_impact[2])
                 )
