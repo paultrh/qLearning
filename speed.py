@@ -534,7 +534,9 @@ for episode in range(HM_EPISODES):
             # print(obs)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    running = False
+                    # running = False
+                    pygame.quit()
+                    exit(0)
 
             win.fill((0, 0, 0))
             map.draw()
