@@ -1,29 +1,26 @@
 import math
-import random
 import time
 import pickle
 import numpy as np
 import pygame
 import itertools
-from multiprocessing.dummy import Pool as ThreadPool
-import matplotlib
 import matplotlib.pyplot as plt
 from numba import jit
 
 win = None
 
-HM_EPISODES = 5000
+HM_EPISODES = 10000
 MOVE_PENALTY = 1  # feel free to tinker with these!
 DEATH_PENALTY = 1000  # feel free to tinker with these!
 
 FOOD_REWARD = 500  # feel free to tinker with these!
-epsilon = 0.3  # randomness
+epsilon = 0.5  # randomness
 EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
 SHOW_EVERY = 1000  # how often to play through env visually.
 
 LEARNING_RATE = 0.3
 DISCOUNT = 0.95
-VEL = 5
+VEL = 3
 
 MAP_SIZE = 50
 
@@ -425,11 +422,12 @@ start = time.time()
 episode_rewards = []
 random_liberty = []
 len_qtable = []
+died_table = []
 
-MANUAL = False
+MANUAL = True
 
-pool = ThreadPool(4)
 for episode in range(HM_EPISODES):
+    DIED = False
     map = Map('map.txt', MAP_SIZE, win)
     p = Player(15 * 5, 15 * 5, 15, map, sensor_size=75)
     episode_reward = 0
@@ -440,7 +438,7 @@ for episode in range(HM_EPISODES):
         show = False
     r = False
     # while 1:
-    for i in range(200):
+    for i in range(400):
         obs = p.get_state()
         # pygame.time.delay(500)
 
@@ -505,7 +503,7 @@ for episode in range(HM_EPISODES):
         if list_action_score_future:
             max_future_q = np.argmax(list_action_score_future)
         else:
-            max_future_q = np.random.randint(0, 4)
+            max_future_q = np.random.randint(0, 1)
 
         # max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
 
@@ -522,7 +520,12 @@ for episode in range(HM_EPISODES):
 
         episode_reward += reward
 
+        if MANUAL:
+            print("score {}".format(episode_reward))
+            print("{} {}".format(p.centerX, p.centerY))
+
         if reward == -DEATH_PENALTY:
+            DIED = True
             break
 
         if show:
@@ -545,6 +548,7 @@ for episode in range(HM_EPISODES):
     epsilon *= EPS_DECAY
     random_liberty.append(epsilon)
     len_qtable.append(len(q_table))
+    died_table.append(0 if DIED and r else 1)
 
     # p.update(x, y)
 
@@ -562,6 +566,11 @@ plt.show()
 
 plt.plot([i for i in len_qtable])
 plt.ylabel(f"Len q table")
+plt.xlabel("episode #")
+plt.show()
+
+plt.plot([i for i in died_table])
+plt.ylabel(f"Did we die because random 0=KO / 1=OK ")
 plt.xlabel("episode #")
 plt.show()
 
