@@ -24,6 +24,8 @@ VEL = 3
 
 MAP_SIZE = 50
 
+EPISODE_TIMEOUT = 500
+MANUAL = False
 
 # Sizing
 # Move base is 1
@@ -424,7 +426,6 @@ random_liberty = []
 len_qtable = []
 died_table = []
 
-MANUAL = True
 
 for episode in range(HM_EPISODES):
     DIED = False
@@ -438,7 +439,7 @@ for episode in range(HM_EPISODES):
         show = False
     r = False
     # while 1:
-    for i in range(400):
+    for i in range(EPISODE_TIMEOUT):
         obs = p.get_state()
         # pygame.time.delay(500)
 
