@@ -13,7 +13,7 @@ MOVE_PENALTY = 1  # feel free to tinker with these!
 DEATH_PENALTY = 1000  # feel free to tinker with these!
 
 FOOD_REWARD = 500  # feel free to tinker with these!
-epsilon = 0.7  # randomness
+epsilon = 0.8  # randomness
 EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
 SHOW_EVERY = 1000  # how often to play through env visually.
 
@@ -72,9 +72,9 @@ start_pos = [
 ]
 
 for episode in range(HM_EPISODES):
-    DIED = False
     map = Map('map.txt', MAP_SIZE)
-    p = Player(*random.choice(start_pos), 15, map, sensor_size=75)
+    p = Player(*random.choice(start_pos), 25, map, sensor_size=75)
+
     episode_reward = 0
 
     if episode % SHOW_EVERY == 0:

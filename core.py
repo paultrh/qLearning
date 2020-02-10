@@ -275,6 +275,8 @@ class Player:
             Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY),
         ]
 
+        self.update(0, 0)    # Trigger computation of initial state
+
     def update(self, x, y):
         Lreward = -Config.getInstance().MOVE_PENALTY
         self.x = self.x + x
