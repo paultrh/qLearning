@@ -8,18 +8,16 @@ import matplotlib.pyplot as plt
 
 from core import Map, Player, Config
 
-win = None
-
 HM_EPISODES = 10000
 MOVE_PENALTY = 1  # feel free to tinker with these!
 DEATH_PENALTY = 1000  # feel free to tinker with these!
 
 FOOD_REWARD = 500  # feel free to tinker with these!
-epsilon = 0.5  # randomness
+epsilon = 0.7  # randomness
 EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
 SHOW_EVERY = 1000  # how often to play through env visually.
 
-LEARNING_RATE = 0.3
+LEARNING_RATE = 0.5
 DISCOUNT = 0.95
 VEL = 3
 
@@ -27,6 +25,7 @@ MAP_SIZE = 50
 
 EPISODE_TIMEOUT = 500
 MANUAL = False
+LOAD = False
 
 
 # Sizing
@@ -36,7 +35,12 @@ MANUAL = False
 # init pos is 1.5 block in x and y
 # allowed move is 5 * nb block in first row
 
-def generate_qtable():
+def generate_qtable(load):
+    if load:
+        qtable = None
+        with open('qtable.pickle', 'rb') as f:
+            qtable = pickle.load(f)
+        return qtable
     return {}
     start = time.time()
     qtable = {}
@@ -46,7 +50,7 @@ def generate_qtable():
     return qtable
 
 
-q_table = generate_qtable()
+q_table = generate_qtable(LOAD)
 
 pygame.init()
 win = pygame.display.set_mode((500, 500))
@@ -56,7 +60,6 @@ start = time.time()
 episode_rewards = []
 random_liberty = []
 len_qtable = []
-died_table = []
 
 # Singleton that holds global variables
 c = Config(win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
@@ -85,14 +88,14 @@ for episode in range(HM_EPISODES):
         # pygame.time.delay(500)
 
         action = 0
-        if np.random.random() > epsilon:
+        if LOAD or np.random.random() > epsilon:
             r = False
             list_action_score = q_table.get(obs, None)
             if list_action_score:
                 action = np.argmax(list_action_score)
             else:
+                r = True
                 action = np.random.randint(0, 4)
-
         else:
             r = True
             action = np.random.randint(0, 4)
@@ -103,7 +106,7 @@ for episode in range(HM_EPISODES):
         x = 0
         y = 0
 
-        if MANUAL:
+        if not LOAD and MANUAL:
             pygame.event.wait()
             keys = pygame.key.get_pressed()
 
@@ -170,7 +173,7 @@ for episode in range(HM_EPISODES):
             DIED = True
             break
 
-        if show:
+        if show or LOAD:
             # pygame.time.delay(1000)
             # print(obs)
             for event in pygame.event.get():
@@ -192,7 +195,6 @@ for episode in range(HM_EPISODES):
     epsilon *= EPS_DECAY
     random_liberty.append(epsilon)
     len_qtable.append(len(q_table))
-    died_table.append(0 if DIED and r else 1)
 
     # p.update(x, y)
 
@@ -213,12 +215,8 @@ plt.ylabel(f"Len q table")
 plt.xlabel("episode #")
 plt.show()
 
-plt.plot([i for i in died_table])
-plt.ylabel(f"Did we die because random 0=KO / 1=OK ")
-plt.xlabel("episode #")
-plt.show()
-
-with open(f"qtable.pickle", "wb") as f:
-    pickle.dump(q_table, f)
+if not LOAD:
+    with open(f"qtable.pickle", "wb") as f:
+        pickle.dump(q_table, f)
 
 pygame.quit()
