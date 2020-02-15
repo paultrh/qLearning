@@ -15,7 +15,7 @@ DEATH_PENALTY = 1000  # feel free to tinker with these!
 FOOD_REWARD = 500  # feel free to tinker with these!
 epsilon = 0.8  # randomness
 EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
-SHOW_EVERY = 1000  # how often to play through env visually.
+SHOW_EVERY = 1  # how often to play through env visually.
 
 LEARNING_RATE = 0.5
 DISCOUNT = 0.95
@@ -146,9 +146,9 @@ for episode in range(HM_EPISODES):
         list_action_score_future = q_table.get(new_obs, None)
         max_future_q = 0
         if list_action_score_future:
-            max_future_q = np.argmax(list_action_score_future)
+            max_future_q = np.max(list_action_score_future)
         else:
-            max_future_q = np.random.randint(0, 1)
+            max_future_q = np.random.random()
 
         # max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
 
