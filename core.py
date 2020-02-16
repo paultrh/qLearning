@@ -1,30 +1,8 @@
 import math
-
 import pygame
 from numba import jit
 
-
-class Config:
-    __instance = None
-
-    @staticmethod
-    def getInstance():
-        """ Static access method. """
-        if Config.__instance is None:
-            Config()
-        return Config.__instance
-
-    def __init__(self, win, move_penalty, death_penalty, food_reward):
-        """ Virtually private constructor. """
-        if Config.__instance is not None:
-            raise Exception("This class is a singleton!")
-        else:
-            Config.__instance = self
-            self.win = win
-            self.MOVE_PENALTY = move_penalty
-            self.DEATH_PENALTY = death_penalty
-            self.FOOD_REWARD = food_reward
-
+winG = None
 
 @jit(nopython=True)
 def get_orientation(p1, p2, p3):
@@ -93,7 +71,7 @@ class Vect:
         return f"{self.x1} {self.y1} {self.x2} {self.y2}"
 
     def draw(self, color):
-        pygame.draw.line(Config.getInstance().win, color, (self.x1, self.y1), (self.x2, self.y2))
+        pygame.draw.line(winG, color, (self.x1, self.y1), (self.x2, self.y2))
 
 
 class Seg:
@@ -154,7 +132,10 @@ class Rect:
 
 
 class Map:
-    def __init__(self, txt_file, size):
+    def __init__(self, txt_file, size, win):
+        global winG
+        self.win = win
+        winG = win
         self.txt_file = txt_file
         with open(self.txt_file, 'r') as f:
             lines = f.readlines()
@@ -246,7 +227,11 @@ class Map:
 
 
 class Player:
-    def __init__(self, x, y, size, map, sensor_size):
+    def __init__(self, x, y, size, map, sensor_size, win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD):
+        self.FOOD_REWARD = FOOD_REWARD
+        self.DEATH_PENALTY = DEATH_PENALTY
+        self.MOVE_PENALTY = MOVE_PENALTY
+        self.win = win
         self.map = map
         self.sensor_size = sensor_size
         self.x = x
@@ -278,7 +263,7 @@ class Player:
         self.update(0, 0)    # Trigger computation of initial state
 
     def update(self, x, y):
-        Lreward = -Config.getInstance().MOVE_PENALTY
+        Lreward = -self.MOVE_PENALTY
         self.x = self.x + x
         self.y = self.y + y
         self.centerX = self.x + self.size / 2
@@ -309,7 +294,7 @@ class Player:
                     res = intersectLines((vectC.x1, vectC.y1), (vectC.x2, vectC.y2), (vectW.x1, vectW.y1),
                                          (vectW.x2, vectW.y2))
                     if res[2]:
-                        Lreward = -Config.getInstance().DEATH_PENALTY
+                        Lreward = -self.DEATH_PENALTY
                         collide = True
                         break
                 if collide:
@@ -317,7 +302,7 @@ class Player:
             if collide:
                 break
 
-        if Lreward != -Config.getInstance().DEATH_PENALTY:
+        if Lreward != -self.DEATH_PENALTY:
             for indexB, bonus in enumerate(self.map.bonus_points):
                 collide = False
                 if indexB in self.map.collected_bonus:
@@ -327,7 +312,7 @@ class Player:
                         res = intersectLines((vectC.x1, vectC.y1), (vectC.x2, vectC.y2), (b.x1, b.y1),
                                              (b.x2, b.y2))
                         if res[2]:
-                            Lreward = Config.getInstance().FOOD_REWARD
+                            Lreward = self.FOOD_REWARD
                             collide = True
                             self.map.collected_bonus.append(indexB)
                             break
@@ -367,7 +352,8 @@ class Player:
                     if min_impact[0] > impact[0]:
                         min_impact = impact
 
-                self.impacts.append(min_impact[3] * max(1, min(round(min_impact[0] / 5), 4)))
+                sensor_dist = int(min_impact[0] - self.size / 2)
+                self.impacts.append(min_impact[3] * sensor_dist)
                 self.points.append(
                     (min_impact[1], min_impact[2])
                 )
@@ -380,7 +366,7 @@ class Player:
         for sensor in self.sensors:
             sensor.draw((0, 255, 0))
         for p in self.points:
-            pygame.draw.circle(Config.getInstance().win, (255, 0, 255), p, 1)
+            pygame.draw.circle(self.win, (255, 0, 255), p, 1)
         self.car.draw()
 
     def get_state(self):
