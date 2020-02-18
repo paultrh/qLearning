@@ -61,12 +61,11 @@ def generate_qtable(load):
             qtable = pickle.load(f)
         return qtable
     return {}
-    start = time.time()
-    qtable = {}
-    for i in itertools.product([-4, -3, -2, -1, 0, 1, 2, 3, 4], repeat=8):  # complexity is 9 ** 8
-        qtable[i] = 0
-    print(time.time() - start)
-    return qtable
+    
+
+    # Total possibility for the Q value map
+    # for i in itertools.product([-4, -3, -2, -1, 0, 1, 2, 3, 4], repeat=8):  # complexity is 9 ** 8
+    #     qtable[i] = 0
 
 
 def plot_final(episode_rewards, random_liberty, len_qtable):
