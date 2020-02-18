@@ -10,9 +10,9 @@ from core import Map, Player
 
 
 GRAPH = True
-HM_EPISODES = 10000
+HM_EPISODES = 40000
 MOVE_PENALTY = 1  # feel free to tinker with these!
-DEATH_PENALTY = 1000  # feel free to tinker with these!
+DEATH_PENALTY = 5000  # feel free to tinker with these!
 
 FOOD_REWARD = 500  # feel free to tinker with these!
 epsilon = 0.8  # randomness
@@ -81,7 +81,7 @@ start_pos = [
 for episode in range(HM_EPISODES):
     map = Map('map.txt', MAP_SIZE, win)
     x, y = random.choice(start_pos)
-    p = Player(x + 1, y + 2, 10, map, 100, win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
+    p = Player(x + 1, y + 2, 10, map, 150, win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
 
     episode_reward = 0
 
