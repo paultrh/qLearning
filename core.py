@@ -242,6 +242,11 @@ class Player:
 
         self.centerX = self.x + size / 2
         self.centerY = self.y + size / 2
+        self.refresh_car()
+        self.refresh_sensors()
+        self.update(0, 0)    # Trigger computation of initial state
+
+    def refresh_car(self):
         self.car = Rect(
             Vect(self.x, self.y, self.x + self.size, self.y),
             Vect(self.x, self.y, self.x, self.y + self.size),
@@ -249,42 +254,27 @@ class Player:
             Vect(self.x + self.size, self.y + self.size, self.x, self.y + self.size),
             (0, 0, 255)
         )
+    def refresh_sensors(self):
         self.sensors = [
-            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX, self.centerY + self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX, self.centerY - self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY),
-            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY),
+            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
+            Vect(self.centerX, self.centerY, self.centerX -  self.sensor_size, self.centerY),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
         ]
-
-        self.update(0, 0)    # Trigger computation of initial state
-
     def update(self, x, y):
         Lreward = -self.MOVE_PENALTY
         self.x = self.x + x
         self.y = self.y + y
         self.centerX = self.x + self.size / 2
         self.centerY = self.y + self.size / 2
-        self.car = Rect(
-            Vect(self.x, self.y, self.x + self.size, self.y),
-            Vect(self.x, self.y, self.x, self.y + self.size),
-            Vect(self.x + self.size, self.y + self.size, self.x + self.size, self.y),
-            Vect(self.x + self.size, self.y + self.size, self.x, self.y + self.size),
-            (255, 255, 255)
-        )
-        self.sensors = [
-            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY - self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX, self.centerY - self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY),
-            Vect(self.centerX, self.centerY, self.centerX, self.centerY + self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY),
-        ]
+        self.refresh_car()
+        self.refresh_sensors()
+
+        
         self.points = []
         self.impacts = []
         for wall in self.map.wall_points:

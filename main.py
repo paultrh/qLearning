@@ -36,6 +36,23 @@ LOAD = False
 # sensor should see at 2 blocks
 # init pos is 1.5 block in x and y
 # allowed move is 5 * nb block in first row
+# Move Up
+def movement(x, y, action):
+    if action == 0:
+        y -= VEL
+
+    # Move Right
+    if action == 1:
+        x += VEL
+
+    # Move Down
+    if action == 2:
+        y += VEL
+
+    # Move Left
+    if action == 3:
+        x -= VEL
+    return x, y
 
 def generate_qtable(load):
     if load:
@@ -51,6 +68,25 @@ def generate_qtable(load):
     print(time.time() - start)
     return qtable
 
+
+def plot_final(episode_rewards, random_liberty, len_qtable):
+    plt.figure()
+    plt.plot([i for i in episode_rewards])
+    plt.ylabel(f"Rewards")
+    plt.xlabel("episode #")
+    plt.savefig("rewards")
+
+    plt.figure()
+    plt.plot([i for i in random_liberty])
+    plt.ylabel(f"Liberty")
+    plt.xlabel("episode #")
+    plt.savefig("liberty")
+
+    plt.figure()
+    plt.plot([i for i in len_qtable])
+    plt.ylabel(f"Len q table")
+    plt.xlabel("episode #")
+    plt.savefig("len_qtable")
 
 def print_obs(obs):
     print('\t\t' + str(obs[4]))
@@ -90,12 +126,8 @@ for episode in range(HM_EPISODES):
     else:
         show = False
     r = False
-    # while 1:
     for i in range(EPISODE_TIMEOUT):
         obs = p.get_state()
-        # pygame.time.delay(500)
-        #print(chr(27) + "[2J")
-        #print_obs(obs)
 
         action = 0
         if LOAD or np.random.random() > epsilon:
@@ -110,45 +142,27 @@ for episode in range(HM_EPISODES):
             r = True
             action = np.random.randint(0, 4)
 
-        # action = np.argmax(q_table[obs])
-        # action = np.argmax((q_table[obs]))
-
         x = 0
         y = 0
 
         if not LOAD and MANUAL:
             pygame.event.wait()
             keys = pygame.key.get_pressed()
-
-            if keys[pygame.K_LEFT]:
-                x -= VEL
-
-            if keys[pygame.K_RIGHT]:
-                x += VEL
-
+            action = -1
             if keys[pygame.K_UP]:
-                y -= VEL
+                action = 0
 
-            if keys[pygame.K_DOWN]:
-                y += VEL
-        else:
+            elif keys[pygame.K_DOWN]:
+                action = 1
 
-            # Move Up
-            if action == 0:
-                y -= VEL
+            elif keys[pygame.K_RIGHT]:
+                action = 2
 
-            # Move Right
-            if action == 1:
-                x += VEL
+            elif keys[pygame.K_LEFT]:
+                action = 3
 
-            # Move Down
-            if action == 2:
-                y += VEL
 
-            # Move Left
-            if action == 3:
-                x -= VEL
-
+        x, y = movement(x, y, action)
         # print(f"on pos {p.centerX} {p.centerY} {obs}") # 122.5 377.5
 
         reward, new_obs = p.update(x, y)
@@ -160,16 +174,14 @@ for episode in range(HM_EPISODES):
         else:
             max_future_q = np.random.random()
 
-        # max_future_q = np.argmax(q_table[new_obs])  # max Q value for this new obs
-
         q_table.setdefault(obs, [0, 0, 0, 0])
         current_q = q_table.get(obs)[action]  # current Q for our chosen action
         new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (reward + DISCOUNT * max_future_q)
-        if reward == -DEATH_PENALTY:
-            if not r and obs + (action,) in already_dead_ops:
-                print(f"DIED AGAIN ON {obs} doing a {action} on pos {p.centerX} {p.centerY}")
-            already_dead_ops.add(obs + (action,))
-            new_q = -DEATH_PENALTY
+        # if reward == -DEATH_PENALTY:
+        #     if not r and obs + (action,) in already_dead_ops:
+        #         print(f"DIED AGAIN ON {obs} doing a {action} on pos {p.centerX} {p.centerY}")
+        #     already_dead_ops.add(obs + (action,))
+        #     new_q = -DEATH_PENALTY
 
         q_table[obs][action] = new_q
 
@@ -185,6 +197,7 @@ for episode in range(HM_EPISODES):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     # running = False
+                    plot_final(episode_rewards, random_liberty, len_qtable)
                     pygame.quit()
                     exit(0)
 
@@ -204,22 +217,7 @@ for episode in range(HM_EPISODES):
 
     # p.update(x, y)
 
-# moving_avg = np.convolve(episode_rewards, np.ones((SHOW_EVERY,))/SHOW_EVERY, mode='valid')
-if GRAPH:
-    plt.plot([i for i in episode_rewards])
-    plt.ylabel(f"Rewards")
-    plt.xlabel("episode #")
-    plt.show()
-
-    plt.plot([i for i in random_liberty])
-    plt.ylabel(f"Liberty")
-    plt.xlabel("episode #")
-    plt.show()
-
-    plt.plot([i for i in len_qtable])
-    plt.ylabel(f"Len q table")
-    plt.xlabel("episode #")
-    plt.show()
+plot_final(episode_rewards, random_liberty, len_qtable)
 
 if not LOAD:
     with open(f"qtable.pickle", "wb") as f:
