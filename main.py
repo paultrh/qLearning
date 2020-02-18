@@ -6,24 +6,26 @@ import pygame
 import itertools
 import matplotlib.pyplot as plt
 
-from core import Map, Player, Config
+from core import Map, Player
 
-HM_EPISODES = 10000
+
+GRAPH = True
+HM_EPISODES = 40000
 MOVE_PENALTY = 1  # feel free to tinker with these!
-DEATH_PENALTY = 1000  # feel free to tinker with these!
+DEATH_PENALTY = 5000  # feel free to tinker with these!
 
 FOOD_REWARD = 500  # feel free to tinker with these!
 epsilon = 0.8  # randomness
 EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
 SHOW_EVERY = 1  # how often to play through env visually.
 
-LEARNING_RATE = 0.5
-DISCOUNT = 0.95
-VEL = 3
+LEARNING_RATE = 0.1
+DISCOUNT = 0.9
+VEL = 5
 
 MAP_SIZE = 50
 
-EPISODE_TIMEOUT = 500
+EPISODE_TIMEOUT = 300
 MANUAL = False
 LOAD = False
 
@@ -50,6 +52,14 @@ def generate_qtable(load):
     return qtable
 
 
+def print_obs(obs):
+    print('\t\t' + str(obs[4]))
+    print('\t' + str(obs[1]) + '\t\t' + str(obs[2]))
+    print(str(obs[7]) + '\t\t\t\t' + str(obs[5]))
+    print('\t' + str(obs[3]) + '\t\t' + str(obs[0]))
+    print('\t\t' + str(obs[6]))
+
+
 q_table = generate_qtable(LOAD)
 
 pygame.init()
@@ -61,9 +71,6 @@ episode_rewards = []
 random_liberty = []
 len_qtable = []
 
-# Singleton that holds global variables
-c = Config(win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
-
 start_pos = [
     (15 * 5, 15 * 5),
     (50 * 10 - 15 * 5, 50 * 10 - 15 * 5),
@@ -72,12 +79,13 @@ start_pos = [
 ]
 
 for episode in range(HM_EPISODES):
-    map = Map('map.txt', MAP_SIZE)
-    p = Player(*random.choice(start_pos), 25, map, sensor_size=75)
+    map = Map('map.txt', MAP_SIZE, win)
+    x, y = random.choice(start_pos)
+    p = Player(x + 1, y + 2, 10, map, 150, win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
 
     episode_reward = 0
 
-    if episode % SHOW_EVERY == 0:
+    if episode % SHOW_EVERY == 0 and SHOW_EVERY > 0:
         show = True
     else:
         show = False
@@ -86,6 +94,8 @@ for episode in range(HM_EPISODES):
     for i in range(EPISODE_TIMEOUT):
         obs = p.get_state()
         # pygame.time.delay(500)
+        #print(chr(27) + "[2J")
+        #print_obs(obs)
 
         action = 0
         if LOAD or np.random.random() > epsilon:
@@ -165,10 +175,6 @@ for episode in range(HM_EPISODES):
 
         episode_reward += reward
 
-        if MANUAL:
-            print("score {}".format(episode_reward))
-            print("{} {}".format(p.centerX, p.centerY))
-
         if reward == -DEATH_PENALTY:
             DIED = True
             break
@@ -187,7 +193,7 @@ for episode in range(HM_EPISODES):
             p.draw()
             pygame.display.update()
 
-    if episode % SHOW_EVERY == 0:
+    if show:
         print(f"{episode} - {episode_reward} in {time.time() - start}")
         start = time.time()
 
@@ -199,21 +205,21 @@ for episode in range(HM_EPISODES):
     # p.update(x, y)
 
 # moving_avg = np.convolve(episode_rewards, np.ones((SHOW_EVERY,))/SHOW_EVERY, mode='valid')
+if GRAPH:
+    plt.plot([i for i in episode_rewards])
+    plt.ylabel(f"Rewards")
+    plt.xlabel("episode #")
+    plt.show()
 
-plt.plot([i for i in episode_rewards])
-plt.ylabel(f"Rewards")
-plt.xlabel("episode #")
-plt.show()
+    plt.plot([i for i in random_liberty])
+    plt.ylabel(f"Liberty")
+    plt.xlabel("episode #")
+    plt.show()
 
-plt.plot([i for i in random_liberty])
-plt.ylabel(f"Liberty")
-plt.xlabel("episode #")
-plt.show()
-
-plt.plot([i for i in len_qtable])
-plt.ylabel(f"Len q table")
-plt.xlabel("episode #")
-plt.show()
+    plt.plot([i for i in len_qtable])
+    plt.ylabel(f"Len q table")
+    plt.xlabel("episode #")
+    plt.show()
 
 if not LOAD:
     with open(f"qtable.pickle", "wb") as f:
