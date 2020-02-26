@@ -1,8 +1,13 @@
 import math
+import random
+
 import pygame
 from numba import jit
 
+from Maze import make_maze_recursion
+
 winG = None
+
 
 @jit(nopython=True)
 def get_orientation(p1, p2, p3):
@@ -131,14 +136,30 @@ class Rect:
         self.d.draw(self.color)
 
 
+start_pos = [
+    (15 * 5, 15 * 5),
+    (50 * 10 - 15 * 5, 50 * 10 - 15 * 5),
+    (50 * 10 - 15 * 5, 15 * 5),
+    (15 * 5, 50 * 10 - 15 * 5)
+]
+
+
 class Map:
-    def __init__(self, txt_file, size, win):
+
+    def __init__(self, size, win, txt_file=None):
         global winG
         self.win = win
         winG = win
         self.txt_file = txt_file
-        with open(self.txt_file, 'r') as f:
-            lines = f.readlines()
+
+        if txt_file:
+            with open(self.txt_file, 'r') as f:
+                lines = f.readlines()
+                x, y = random.choice(start_pos)
+                self.start = (x, y)
+        else:
+            lines, start = make_maze_recursion(10, 10)
+            self.start = start[0] * size, start[1] * size
 
         self.lines = lines
         self.size = size
@@ -156,49 +177,20 @@ class Map:
                 y1 = indexR * self.size
                 if int(elt) == 1:
                     self.wall_points.append(
-                        Seg(
-                            Vect(x1 + self.size / 2, y1, x1 + self.size / 2, y1 + self.size),
+                        Rect(
+                            Vect(x1, y1, x1 + self.size, y1),
+                            Vect(x1, y1, x1, y1 + self.size),
+                            Vect(x1 + self.size, y1 + self.size, x1, y1 + self.size),
+                            Vect(x1 + self.size, y1 + self.size, x1 + self.size, y1),
                             (122, 122, 122)
                         ))
                 if int(elt) == 2:
-                    self.wall_points.append(
-                        Seg(
+                    self.bonus_points.append(
+                        Cross(
                             Vect(x1, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
-                            (122, 122, 122)
+                            Vect(x1 + self.size / 2, y1, x1 + self.size / 2, y1 + self.size),
+                            (0, 255, 255)
                         ))
-                ##########
-                if int(elt) == 3:
-                    self.wall_points.append(
-                        Cross(
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 + self.size),
-                            (122, 122, 122)
-                        )
-                    )
-                if int(elt) == 4:
-                    self.wall_points.append(
-                        Cross(
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size, y1 + self.size / 2),
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 - self.size),
-                            (122, 122, 122)
-                        )
-                    )
-                if int(elt) == 5:
-                    self.wall_points.append(
-                        Cross(
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 - self.size, y1 + self.size / 2),
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 - self.size),
-                            (122, 122, 122)
-                        )
-                    )
-                if int(elt) == 6:
-                    self.wall_points.append(
-                        Cross(
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 - self.size, y1 + self.size / 2),
-                            Vect(x1 + self.size / 2, y1 + self.size / 2, x1 + self.size / 2, y1 + self.size),
-                            (122, 122, 122)
-                        )
-                    )
                 ##########
                 if int(elt) == 7:
                     self.bonus_points.append(
@@ -244,7 +236,7 @@ class Player:
         self.centerY = self.y + size / 2
         self.refresh_car()
         self.refresh_sensors()
-        self.update(0, 0)    # Trigger computation of initial state
+        self.update(0, 0)  # Trigger computation of initial state
 
     def refresh_car(self):
         self.car = Rect(
@@ -254,6 +246,7 @@ class Player:
             Vect(self.x + self.size, self.y + self.size, self.x, self.y + self.size),
             (0, 0, 255)
         )
+
     def refresh_sensors(self):
         self.sensors = [
             Vect(self.centerX, self.centerY, self.centerX, self.centerY - self.sensor_size),
@@ -262,9 +255,10 @@ class Player:
             Vect(self.centerX, self.centerY, self.centerX + self.sensor_size, self.centerY + self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX, self.centerY + self.sensor_size),
             Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY + self.sensor_size),
-            Vect(self.centerX, self.centerY, self.centerX -  self.sensor_size, self.centerY),
+            Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY),
             Vect(self.centerX, self.centerY, self.centerX - self.sensor_size, self.centerY - self.sensor_size),
         ]
+
     def update(self, x, y):
         Lreward = -self.MOVE_PENALTY
         self.x = self.x + x
@@ -274,7 +268,6 @@ class Player:
         self.refresh_car()
         self.refresh_sensors()
 
-        
         self.points = []
         self.impacts = []
         for wall in self.map.wall_points:

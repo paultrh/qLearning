@@ -10,14 +10,14 @@ from core import Map, Player
 
 
 GRAPH = True
-HM_EPISODES = 40000
+HM_EPISODES = 20000
 MOVE_PENALTY = 1  # feel free to tinker with these!
 DEATH_PENALTY = 5000  # feel free to tinker with these!
 
 FOOD_REWARD = 500  # feel free to tinker with these!
-epsilon = 0.8  # randomness
+epsilon = 0.6  # randomness
 EPS_DECAY = 0.9999  # Every episode will be epsilon*EPS_DECAY
-SHOW_EVERY = 1  # how often to play through env visually.
+SHOW_EVERY = 1000  # how often to play through env visually.
 
 LEARNING_RATE = 0.1
 DISCOUNT = 0.9
@@ -57,7 +57,7 @@ def movement(x, y, action):
 def generate_qtable(load):
     if load:
         qtable = None
-        with open('qtable.pickle', 'rb') as f:
+        with open('trained_qtable_40k.pickle', 'rb') as f:
             qtable = pickle.load(f)
         return qtable
     return {}
@@ -98,7 +98,7 @@ def print_obs(obs):
 q_table = generate_qtable(LOAD)
 
 pygame.init()
-win = pygame.display.set_mode((500, 500))
+win = pygame.display.set_mode((700, 700))
 
 already_dead_ops = set()
 start = time.time()
@@ -114,9 +114,9 @@ start_pos = [
 ]
 
 for episode in range(HM_EPISODES):
-    map = Map('map.txt', MAP_SIZE, win)
-    x, y = random.choice(start_pos)
-    p = Player(x + 1, y + 2, 10, map, 150, win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
+    #map = Map(MAP_SIZE, win, file='map2.txt')
+    map = Map(MAP_SIZE, win)
+    p = Player(map.start[0] + 1, map.start[1] + 2, 10, map, 150, win, MOVE_PENALTY, DEATH_PENALTY, FOOD_REWARD)
 
     episode_reward = 0
 
